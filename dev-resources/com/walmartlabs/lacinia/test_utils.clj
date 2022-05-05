@@ -204,17 +204,23 @@
   ([]
    (subscriptions-fixture ws-uri))
   ([uri]
+   (subscriptions-fixture uri {}))
+  ([uri {:keys [subprotocols]
+         :or {subprotocols ["graphql-ws"]}}]
    (fn [f]
      (log/debug :reason ::test-start :uri uri)
      (let [messages-ch (chan 10)
            session @(ws/websocket uri
-                                  {:subprotocols ["graphql-ws"]
+                                  {:subprotocols subprotocols
                                    :on-message (fn [_ ^HeapCharBuffer msg last?]
                                                  (let [message-text (.toString msg)]
                                                    (log/debug :reason ::receive :message message-text)
                                                    (put! messages-ch (cheshire/parse-string message-text true))))
                                    :on-open (fn [_] (log/debug :reason ::connected))
-                                   :on-close #(log/debug :reason ::closed :code %2 :message %3)
+                                   :on-close (fn [_ code message]
+                                               (log/debug :reason ::closed :code code :message message)
+                                               (put! messages-ch {:code code
+                                                                  :message message}))
                                    :on-error (fn [_ error]
                                                (log/error :reason ::unexpected-error
                                                           :exception error))})]
